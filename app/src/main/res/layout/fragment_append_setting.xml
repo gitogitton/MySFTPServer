@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#ffffff"
+    tools:context=".AppendSettingFragment">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:orientation="vertical" >
+
+            <TextView
+                android:id="@+id/text_user_name"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:textSize="20sp"
+                android:text="@string/item_user_name" />
+            <EditText
+                android:id="@+id/edit_user_name"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:inputType="text"
+                android:background="#eeeeee"
+                android:textSize="30sp"
+                android:hint="@string/hint_input_user_name"/>
+
+            <TextView
+                android:id="@+id/text_password"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="10dp"
+                android:textSize="20sp"
+                android:text="@string/item_password"/>
+            <EditText
+                android:id="@+id/edit_password"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:inputType="textPassword"
+                android:background="#eeeeee"
+                android:textSize="30sp"
+                android:hint="@string/hint_input_password"/>
+
+            <TextView
+                android:id="@+id/text_port_no"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="10dp"
+                android:textSize="20sp"
+                android:text="@string/item_port_no"/>
+            <EditText
+                android:id="@+id/edit_port_no"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:inputType="numberDecimal"
+                android:background="#eeeeee"
+                android:textSize="30sp"
+                android:hint="@string/hint_input_port_no"/>
+
+            <TextView
+                android:id="@+id/text_public_key"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="10dp"
+                android:textSize="20sp"
+                android:text="@string/item_public_key"/>
+            <EditText
+                android:id="@+id/edit_public_key"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:inputType="text"
+                android:background="#eeeeee"
+                android:textSize="30sp"
+                android:hint="@string/hint_input_public_key"/>
+            <Button
+                android:id="@+id/button_browser"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="@string/button_browse"/>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</android.support.constraint.ConstraintLayout>

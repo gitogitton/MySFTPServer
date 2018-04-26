@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">sFTP Server</string>
+    <string name="MyNetwork">ネットワーク名</string>
+
+    <string name="menu_append_setting">設定を追加</string>
+    <string name="menu_apl_end">アプリを終了</string>
+
+    <string name="menu_save">登録</string>
+    <string name="menu_remove">削除</string>
+
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="item_user_name">User Name</string>
+    <string name="hint_input_user_name">(user name)</string>
+    <string name="item_password">Password</string>
+    <string name="hint_input_password">(password)</string>
+    <string name="item_port_no">Port No.</string>
+    <string name="hint_input_port_no">(Port No)</string>
+    <string name="item_public_key">Public key file</string>
+    <string name="hint_input_public_key">(public key file)</string>
+    <string name="button_browse">Browse</string>
+
+    <string name="no_data">No Data.</string>
+    <string name="up_folder">Go to Up Folder</string>
+</resources>
