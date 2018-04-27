@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">sFTP Server</string>
     <string name="MyNetwork">ネットワーク名</string>
+    <string name="NetworkStatus">disable</string>
 
     <string name="menu_append_setting">設定を追加</string>
     <string name="menu_apl_end">アプリを終了</string>

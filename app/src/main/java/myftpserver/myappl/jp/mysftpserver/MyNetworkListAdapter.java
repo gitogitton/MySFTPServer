@@ -32,6 +32,8 @@ public class MyNetworkListAdapter extends ArrayAdapter<MyNetworkItem> {
         MyNetworkItem myNetworkItem = getItem( position );
         TextView textView = convertView.findViewById( R.id.text_network_name );
         textView.setText( myNetworkItem.getNetworkName().getText() );
+        TextView textView_1 = convertView.findViewById( R.id.text_network_status );
+        textView_1.setText( myNetworkItem.getNetworkStatus().getText() );
 
         return convertView;
     }

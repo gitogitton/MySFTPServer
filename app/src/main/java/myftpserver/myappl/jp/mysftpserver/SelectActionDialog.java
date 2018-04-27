@@ -24,12 +24,14 @@ public class SelectActionDialog extends DialogFragment {
     private final String CLASS_NAME = getClass().getSimpleName();
     private String mTitle = null;
     private String mSetting = null;
+    private boolean mAlive = false;
 
-    public static SelectActionDialog newInstance( String title, String setting ) {
+    public static SelectActionDialog newInstance( String title, String setting, boolean serverAlive ) {
         SelectActionDialog selectFileDiaglog = new SelectActionDialog();
         Bundle args = new Bundle();
         args.putString("title", title);
         args.putString("setting", setting);
+        args.putBoolean("alive", serverAlive);
         selectFileDiaglog.setArguments(args);
         return selectFileDiaglog;
     }
@@ -41,6 +43,7 @@ public class SelectActionDialog extends DialogFragment {
         if ( getArguments() != null ) {
             mTitle = getArguments().getString( "title" );
             mSetting = getArguments().getString( "setting" ); //Activityに戻る時に一緒に返している
+            mAlive = getArguments().getBoolean( "alive" );
         }
     }
 
@@ -57,7 +60,8 @@ public class SelectActionDialog extends DialogFragment {
         AlertDialog.Builder builder = new AlertDialog.Builder(Objects.requireNonNull(getActivity()));
 //below : customizu title        builder.setTitle( mTitle ); // normal title
         TextView titleText = new TextView( getContext() );
-        titleText.setText( mTitle );
+        String s = mSetting + " : " + mTitle;
+        titleText.setText( s );
         titleText.setTextColor( Color.BLUE );
         titleText.setTextSize( COMPLEX_UNIT_SP, 20 );
         titleText.setPadding( 10, 10, 10, 10 );
@@ -65,8 +69,7 @@ public class SelectActionDialog extends DialogFragment {
 
         final ArrayList<String> arrayList = new ArrayList<>();
 
-        arrayList.add( "Start SFTP" );
-        arrayList.add( "Stop SFTP");
+        arrayList.add("Start / Stop SFTP");
         arrayList.add( "Edit Setting" );
         arrayList.add( "Remove Setting" );
 
@@ -75,7 +78,7 @@ public class SelectActionDialog extends DialogFragment {
         builder.setSingleChoiceItems( selectActionAdapter, -1, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                //Log.d( CLASS_NAME, "setSingleChoiceItems().onClick() which->" + which + " (size= " + arrayList.size() + " )" );
+                Log.d( CLASS_NAME, "setSingleChoiceItems().onClick() which->" + which + " (size= " + arrayList.size() + " )" );
                 //Log.d( CLASS_NAME, "setSingleChoiceItems().onClick() item->" + file.getAbsolutePath() );
                 ( (MainActivity)getContext() ).onSelectAction( which, mSetting ); //activityのメソッドを呼ぶ
                 dismiss();

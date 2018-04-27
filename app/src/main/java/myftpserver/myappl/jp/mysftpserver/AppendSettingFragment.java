@@ -19,10 +19,13 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 
 
 /**
@@ -33,29 +36,26 @@ import java.io.IOException;
 public class AppendSettingFragment extends Fragment implements SelectFileDialog.OnSelectListListener {
     private final String CLASS_NAME = getClass().getSimpleName();
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-    private static final String ARG_PARAM1 = "param1";
+    private static final String ARG_PARAM1 = "setting";
     private static final String ARG_PARAM2 = "param2";
 
-    private String mParam1;
+    private String mSetting;
     private String mParam2;
     private View mView;
+
+    public interface OnSaveNewData {
+        public void onSaveNewData();
+    }
+    private OnSaveNewData mListener;
 
     public AppendSettingFragment() {
         // Required empty public constructor
     }
 
-    /**
-     * Use this factory method to create a new instance of
-     * this fragment using the provided parameters.
-     *
-     * @param param1 Parameter 1.
-     * @param param2 Parameter 2.
-     * @return A new instance of fragment AppendSettingFragment.
-     */
-    public static AppendSettingFragment newInstance(String param1, String param2) {
+    public static AppendSettingFragment newInstance(String setting, String param2) {
         AppendSettingFragment fragment = new AppendSettingFragment();
         Bundle args = new Bundle();
-        args.putString(ARG_PARAM1, param1);
+        args.putString(ARG_PARAM1, setting);
         args.putString(ARG_PARAM2, param2);
         fragment.setArguments(args);
         return fragment;
@@ -65,7 +65,7 @@ public class AppendSettingFragment extends Fragment implements SelectFileDialog.
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
-            mParam1 = getArguments().getString(ARG_PARAM1);
+            mSetting = getArguments().getString(ARG_PARAM1);
             mParam2 = getArguments().getString(ARG_PARAM2);
         }
     }
@@ -82,6 +82,7 @@ public class AppendSettingFragment extends Fragment implements SelectFileDialog.
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
                 if ( keyCode == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_DOWN ) {
+                    Log.d( CLASS_NAME, "push Back Key." );
                     ActionBar actionBar = ( (AppCompatActivity)getActivity()) .getSupportActionBar();
                     actionBar.setTitle( R.string.app_name ); //タイトル変更
                     actionBar.setDisplayHomeAsUpEnabled( false ); //HOMEへ戻る「←」非表示
@@ -108,8 +109,32 @@ public class AppendSettingFragment extends Fragment implements SelectFileDialog.
         setHasOptionsMenu( true ); //オプションメニューを使用する事を宣言
 
         ActionBar actionBar = ( (AppCompatActivity)getActivity() ).getSupportActionBar();
-        actionBar.setTitle( "設定を追加" );
+        actionBar.setTitle( "設定を編集" );
         actionBar.setDisplayHomeAsUpEnabled( true );
+
+        if ( mSetting != null ) { //既存のファイルから読み込んでviewに設定
+            MySshSetting mySshSetting = restoreInitDataFromFile( mSetting );
+
+            EditText editUserName = mView.findViewById( R.id.edit_user_name );
+            editUserName.setText( mySshSetting.getUserName() );
+            EditText editPassword = mView.findViewById( R.id.edit_password );
+            editPassword.setText( mySshSetting.getPassword() );
+            EditText editPort = mView.findViewById( R.id.edit_port_no );
+            editPort.setText( String.valueOf( mySshSetting.getPortNo() ) );
+            EditText editPublicKeyFile = mView.findViewById( R.id.edit_public_key );
+            editPublicKeyFile.setText( mySshSetting.getPublicKey() );
+        }
+    }
+
+    @Override
+    public void onAttach(Context context) {
+        Log.d( CLASS_NAME, "onAttach()" );
+        super.onAttach(context);
+        if ( context instanceof MainActivity ) {
+            mListener = (OnSaveNewData) context;
+        } else {
+            throw new ClassCastException("activity が OnSaveNewData を実装していない。");
+        }
     }
 
     @Override
@@ -127,9 +152,22 @@ public class AppendSettingFragment extends Fragment implements SelectFileDialog.
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+//        Log.d( CLASS_NAME, "onOptionsItemSelected()" + item );
+        ActionBar actionBar = ( (AppCompatActivity)getActivity()) .getSupportActionBar();
+        //ちょっとさぼる・・・
         switch ( item.getItemId() ) {
+            case android.R.id.home :
+                Log.d( CLASS_NAME, "android.R.id.home " + item );
+                actionBar.setTitle( R.string.app_name ); //タイトル変更
+                actionBar.setDisplayHomeAsUpEnabled( false ); //HOMEへ戻る「←」非表示
+                getFragmentManager().popBackStack();
+                return true;
             case R.id.menu_save :
                 saveSetting();
+                actionBar.setTitle( R.string.app_name ); //タイトル変更
+                actionBar.setDisplayHomeAsUpEnabled( false ); //HOMEへ戻る「←」非表示
+                mListener.onSaveNewData();
+                getFragmentManager().popBackStack();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -167,7 +205,6 @@ public class AppendSettingFragment extends Fragment implements SelectFileDialog.
         //Context.openFileOutput, Context.openFileInput はandroidで既定のFolderへアクセスする。だからパスはいらない。(パスは Context.getFileDir() で確認出来る。)
         try {
             String BR = System.getProperty( "line.separator" ); //改行コード取得
-            FileOutputStream fileOutputStream = getContext().openFileOutput( createdFile, Context.MODE_PRIVATE );
             StringBuffer writeData = new StringBuffer();
             writeData.append( editUserName.getText().toString() );
             writeData.append( "," );
@@ -176,8 +213,9 @@ public class AppendSettingFragment extends Fragment implements SelectFileDialog.
             writeData.append( editPortNo.getText().toString() );
             writeData.append( "," );
             writeData.append( editPublicKey.getText().toString() );
-            //writeData.append( "," );
+            writeData.append( "," );
             writeData.append( BR ); //改行
+            FileOutputStream fileOutputStream = getContext().openFileOutput( createdFile, Context.MODE_PRIVATE );
             try {
                 fileOutputStream.write( writeData.toString().getBytes() );
                 fileOutputStream.close();
@@ -190,4 +228,46 @@ public class AppendSettingFragment extends Fragment implements SelectFileDialog.
         }
     }
 
+    private MySshSetting restoreInitDataFromFile( String settingFileName ) {
+        if ( settingFileName == null ) {
+            return null;
+        }
+        MySshSetting sshSetting = new MySshSetting();
+        try {
+            FileInputStream inputStream = getContext().openFileInput( settingFileName );
+            BufferedReader buffer = new BufferedReader( new InputStreamReader( inputStream ) );
+            try {
+                String readData = buffer.readLine();
+                String[] splittData = readData.split( "," );
+
+                for ( int i=0; i<splittData.length; i++ ) {
+                    switch ( i ) {
+                        case 0 : //username
+                            sshSetting.setUserName( splittData[0] );
+                            break;
+                        case 1 : //password
+                            sshSetting.setPassword( splittData[1] );
+                            break;
+                        case 2 : //port No.
+                            sshSetting.setPortNo( Integer.parseInt( splittData[2] ) );
+                            break;
+                        case 3 : //public key file name
+                            sshSetting.setPublicKey( splittData[3] );
+                            break;
+                        default:
+                            break;
+                    }
+                }
+
+                buffer.close();
+                inputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        return sshSetting;
+    }
 }

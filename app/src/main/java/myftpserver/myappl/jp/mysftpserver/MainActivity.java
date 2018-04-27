@@ -1,7 +1,10 @@
 package myftpserver.myappl.jp.mysftpserver;
 
+import android.content.Context;
+import android.content.DialogInterface;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -26,6 +29,7 @@ import org.apache.sshd.server.shell.ProcessShellFactory;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -33,13 +37,16 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements AppendSettingFragment.OnSaveNewData {
 
     private final String CLASS_NAME = getClass().getSimpleName();
     private final String FILE_PREFIX = "sftp_";
     private final String FILE_EXTENSION = ".csv";
 
     private SshServer mSshd = null;
+    private ListView mMyNetworkList;
+    private boolean mServerIsAlive = false;
+    private String mAliveServerName = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,7 +54,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         showNetworkList();
-
     }
 
     @Override
@@ -68,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
                 //sftpを終了し、アプリを終了する
                 break;
             case R.id.menu_append_setting :
-                appendSetting();
+                editSetting( null );
                 break;
             default:
                 break;
@@ -77,31 +83,68 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onSelectAction( int menuIndex, String setting ) {
-        Log.d( CLASS_NAME, "onSelectAction() menuIndex->" + menuIndex );
+        //Log.d( CLASS_NAME, "onSelectAction() menuIndex / alive : " + menuIndex + " / " + mAliveServerName );
         switch ( menuIndex ) {
-            case 0 :
-                startSFTP( setting );
-                break;
-            case 1 :
-                if ( mSshd != null ) {
-                    try {
-                        mSshd.stop();
-                        mSshd = null;
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
+            case 0 : //start / stop
+                if (mServerIsAlive) { //Serverが Alive なら Stop する
+                    if ( !mAliveServerName.equals( setting ) ) { //現在 Alive なサーバーとは異なるサーバーの start/stop が選択された時無視！！
+                        String message = "Other Setting Alive ! \nPlease disable that setting. \n[ "  + mAliveServerName + " is Alive Now ]";
+                        showAlertDialog( message );
+                        return;
                     }
+                    if ( mSshd != null ) {
+                        try {
+                            mServerIsAlive = false;
+                            mAliveServerName = null;
+                            mSshd.stop();
+                            mSshd = null;
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                } else {  //Serverが Not Alive なら Start する
+                    mServerIsAlive = true;
+                    mAliveServerName = setting;
+                    startSFTP( setting );
                 }
+                updateStatus( setting, mServerIsAlive);
+                break;
+            case 1 : //edit setting
+                if ( mServerIsAlive && mAliveServerName.equals( setting ) ) {
+                    showAlertDialog( "Please after Stop. [edit]" );
+                    return;
+                }
+                String fileName = FILE_PREFIX + setting + FILE_EXTENSION;
+                editSetting( fileName );
+                break;
+            case 2 : //remove setting
+                if ( mServerIsAlive && mAliveServerName.equals( setting ) ) {
+                    showAlertDialog( "Please stop. [remove]" );
+                    return;
+                }
+                String removeName = FILE_PREFIX + setting + FILE_EXTENSION;
+                removeSettingFile( removeName );
+                break;
+            default:
                 break;
         }
+    }
+
+    @Override
+    public void onSaveNewData() {
+        ArrayList<MyNetworkItem> myNetworkItemArrayList;
+        myNetworkItemArrayList = getMyNetworkList();
+        MyNetworkListAdapter myNetworkListAdapter = new MyNetworkListAdapter( getApplicationContext(), R.layout.list_my_network, myNetworkItemArrayList );
+        mMyNetworkList.setAdapter( myNetworkListAdapter );
     }
 
     //
     //private methods
     //
-    private void appendSetting() {
+    private void editSetting(String setting ) {
         AppendSettingFragment appendSettingFragment = new AppendSettingFragment();
         Bundle args = new Bundle();
-        args.putString( "param1", "" );
+        args.putString( "setting", setting );
         args.putString( "param2", "" );
         appendSettingFragment.setArguments( args );
 
@@ -113,20 +156,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showNetworkList() {
-        ListView myNetworkList = findViewById( R.id.list_my_network );
+        mMyNetworkList = findViewById( R.id.list_my_network );
 
         ArrayList<MyNetworkItem> myNetworkItemArrayList;
         myNetworkItemArrayList = getMyNetworkList();
 
         MyNetworkListAdapter myNetworkListAdapter = new MyNetworkListAdapter( getApplicationContext(), R.layout.list_my_network, myNetworkItemArrayList );
-        myNetworkList.setAdapter( myNetworkListAdapter );
+        mMyNetworkList.setAdapter( myNetworkListAdapter );
 
         //ListView listener.
-        myNetworkList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        mMyNetworkList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 MyNetworkItem item = (MyNetworkItem) parent.getItemAtPosition( position ); //選択した設定
-                SelectActionDialog selectActionDiaglog = SelectActionDialog.newInstance( "Select Action", item.getNetworkName().getText().toString() );
+                SelectActionDialog selectActionDiaglog = SelectActionDialog.newInstance( "Select Action",
+                        item.getNetworkName().getText().toString(), mServerIsAlive);
                 selectActionDiaglog.show( getSupportFragmentManager(), "selectFileDialog" );
             }
         });
@@ -148,9 +192,13 @@ public class MainActivity extends AppCompatActivity {
                 MyNetworkItem myNetworkItem = new MyNetworkItem();
                 String name = file.getName();
                 name = name.substring( FILE_PREFIX.length(), ( name.length()-FILE_EXTENSION.length() ) );
-                TextView textView = new TextView( getApplicationContext() );
-                textView.setText( name );
-                myNetworkItem.setNetworkName( textView );
+                TextView textNetName = new TextView( getApplicationContext() );
+                textNetName.setText( name );
+                myNetworkItem.setNetworkName( textNetName );
+                TextView textNetStat = new TextView( getApplicationContext() );
+                textNetStat.setText( "" );
+                myNetworkItem.setNetworkStatus( textNetStat );
+
                 myNetworkItemArrayList.add( myNetworkItem );
             }
         }
@@ -185,12 +233,58 @@ public class MainActivity extends AppCompatActivity {
         return mySshSetting;
     }
 
+    private void updateStatus( String setting, boolean start ) {
+        MyNetworkListAdapter adapter = (MyNetworkListAdapter)mMyNetworkList.getAdapter();
+        int lineNum = adapter.getCount();
+        for ( int i=0; i<lineNum; i++ ) {
+            MyNetworkItem item = adapter.getItem( i );
+            if ( item.getNetworkName().getText().toString().equals( setting ) ) {
+                String status = start?"active":" ";
+                item.getNetworkStatus().setText( status );
+                adapter.notifyDataSetChanged();
+                break;
+            }
+        }
+    }
+
+    private void removeSettingFile( String fileName ) {
+        if ( fileName == null ) {
+            return;
+        }
+        String file = getFilesDir() + "/" + fileName;
+        File targetFile = new File( file );
+        boolean result = targetFile.delete();
+
+        removeItemFromList( fileName );
+
+        String message;
+        message = ( result?"有無を言わさず消しました：":"失敗！！：" ) + fileName;
+        showAlertDialog( message );
+    }
+
+    private void removeItemFromList( String removeFile ) {
+        MyNetworkListAdapter adapter = (MyNetworkListAdapter) mMyNetworkList.getAdapter();
+        for ( int i=0; i<adapter.getCount(); i++ ) {
+            String itemString = adapter.getItem( i ).getNetworkName().getText().toString();
+            itemString = FILE_PREFIX + itemString + FILE_EXTENSION; //craete File Name.
+            if ( removeFile.equals( itemString ) ) {
+                adapter.remove( adapter.getItem( i ) );
+                adapter.notifyDataSetChanged();
+                break;
+            }
+        }
+    }
+
     private void startSFTP( String setting ) {
 
         //============================================================================
         //restore setting data from file
         //============================================================================
         MySshSetting mySshSetting = restoreSshSettingData( setting );
+        //============================================================================
+        //update status
+        //============================================================================
+        updateStatus( setting, mServerIsAlive);
         //============================================================================
         //ssh
         //============================================================================
@@ -253,5 +347,19 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void showAlertDialog( String message ) {
+        AlertDialog.Builder builder = new AlertDialog.Builder( this );
+        builder.setTitle( "Alert" );
+        builder.setMessage( message );
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                //Log.d( CLASS_NAME, "AlertDialog : push OK" );
+                dialog.dismiss();
+            }
+        });
+        builder.show();
     }
 }
