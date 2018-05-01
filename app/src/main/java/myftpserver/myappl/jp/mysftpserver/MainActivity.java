@@ -19,10 +19,13 @@ import org.apache.sshd.SshServer;
 import org.apache.sshd.common.NamedFactory;
 import org.apache.sshd.common.util.OsUtils;
 import org.apache.sshd.server.Command;
+import org.apache.sshd.server.PasswordAuthenticator;
+import org.apache.sshd.server.PublickeyAuthenticator;
 import org.apache.sshd.server.UserAuth;
 import org.apache.sshd.server.auth.UserAuthPublicKey;
 import org.apache.sshd.server.command.ScpCommandFactory;
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
+import org.apache.sshd.server.session.ServerSession;
 import org.apache.sshd.server.sftp.SftpSubsystem;
 import org.apache.sshd.server.shell.ProcessShellFactory;
 
@@ -30,9 +33,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.security.PublicKey;
+import java.security.interfaces.RSAPublicKey;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -275,7 +281,7 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
         }
     }
 
-    private void startSFTP( String setting ) {
+    private void startSFTP(final String setting ) {
 
         //============================================================================
         //restore setting data from file
@@ -302,20 +308,60 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
         //============================================================================
         //認証方式の設定
         //============================================================================
-//        // パスワード認証方式を設定
-//        //PasswordAuthenticator passwordAuthenticator = sshd.getPasswordAuthenticator();
-//        sshd.setPasswordAuthenticator( new MyPasswordAuthenticator() ); //パスワード認証のロジックinterface
+        // パスワード認証方式を設定　(使わないけれど置いておく。)
+        //PasswordAuthenticator passwordAuthenticator = sshd.getPasswordAuthenticator();
+        mSshd.setPasswordAuthenticator( new PasswordAuthenticator() {
+        //パスワード認証のロジックinterface
+            @Override
+            public boolean authenticate(String username, String password, ServerSession session) {
+                return false;
+            }
+        });
         // 公開鍵認証方式を設定
-        mSshd.setPublickeyAuthenticator( new MyPublickeyAuthenticator() );
+        mSshd.setPublickeyAuthenticator( new PublickeyAuthenticator() {
+            @Override
+            public boolean authenticate(String username, PublicKey key, ServerSession session) {
+
+                String fileName = "sftp_" + username + ".csv";
+                File file = new File( getApplicationContext().getFilesDir() + "/" + fileName );
+                if ( !file.exists() ) {
+                    return false;
+                }
+
+                String settingPubKey = null;
+                try {
+                    FileInputStream inputStream = openFileInput( fileName );
+                    BufferedReader bufferedReader = new BufferedReader( new InputStreamReader( inputStream ) );
+                    try {
+                        String buff = bufferedReader.readLine();
+                        String[] item = buff.split( "," );
+                        if ( item.length >= 4 ) {
+                            settingPubKey = item[3];
+                        }
+                        inputStream.close();
+                        bufferedReader.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+
+                if ( settingPubKey == null ) return false; //no setting
+
+                File keyFile = new File( settingPubKey );
+                if ( !keyFile.exists() ) return false; //no specified file
+
+                if ( !( key instanceof RSAPublicKey ) ) return false; //only RSA type
+
+                return true;
+            }
+        });
 
         List<NamedFactory<UserAuth>> userAuthFactories = new ArrayList<>();
-//        userAuthFactories.add( new UserAuthPassword.Factory() );
+//パスワード認証はなし    userAuthFactories.add( new UserAuthPassword.Factory() );
         userAuthFactories.add( new UserAuthPublicKey.Factory() );
         mSshd.setUserAuthFactories( userAuthFactories );
-
-        List<NamedFactory<Command>> namedFactoryList = new ArrayList<>();
-        namedFactoryList.add( new SftpSubsystem.Factory() );
-        mSshd.setSubsystemFactories( namedFactoryList ); //sftp有効化
 
         //============================================================================
         // sshのログインシェルを設定・・・セキュリティーを考慮するとない方がいい？
@@ -333,11 +379,19 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
         }
         //shell設定：シェルファクトリは、ユーザーがログインするたびに新しいシェルを作成するために使用されます.SSHDは、必要に応じて使用できる単一の実装を提供します。
         mSshd.setShellFactory( new ProcessShellFactory( command, options ) );
+
         //============================================================================
         //SCP有効化
         //============================================================================
         //CommandFactoryは、SSHサーバに直接コマンドを送信する場合に使用されます。これは、ssh localhost shutdownまたはscp xxxを実行している場合に発生します
         mSshd.setCommandFactory( new ScpCommandFactory() ); //scp有効化
+
+        //============================================================================
+        //SFTP 有効化
+        //============================================================================
+        List<NamedFactory<Command>> namedFactoryList = new ArrayList<>();
+        namedFactoryList.add( new SftpSubsystem.Factory() );
+        mSshd.setSubsystemFactories( namedFactoryList ); //sftp有効化
 
         //============================================================================
         //SSH開始

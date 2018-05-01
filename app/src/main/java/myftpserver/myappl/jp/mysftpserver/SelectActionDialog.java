@@ -79,7 +79,7 @@ public class SelectActionDialog extends DialogFragment {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 Log.d( CLASS_NAME, "setSingleChoiceItems().onClick() which->" + which + " (size= " + arrayList.size() + " )" );
-                //Log.d( CLASS_NAME, "setSingleChoiceItems().onClick() item->" + file.getAbsolutePath() );
+                //Log.d( CLASS_NAME, "setSingleChoiceItems().onClick() item->" + F.getAbsolutePath() );
                 ( (MainActivity)getContext() ).onSelectAction( which, mSetting ); //activityのメソッドを呼ぶ
                 dismiss();
             }
