@@ -29,7 +29,6 @@ dependencies {
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
-    implementation 'org.apache.sshd:sshd-sftp:0.10.0'
-    //add 2018.4.19 --> 2018.5.4：使えないクラスなどがあるが理由がわからない。とりあえずバージョンを変えてローカルにライブラリー（apache-sshd-1.6.0）をもってくる。
+    implementation 'org.apache.sshd:sshd-sftp:0.11.0'
     implementation files('libs/bcprov-jdk15on-159.jar')
 }
