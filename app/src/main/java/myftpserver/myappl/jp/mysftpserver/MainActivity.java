@@ -1,6 +1,5 @@
 package myftpserver.myappl.jp.mysftpserver;
 
-import android.content.Context;
 import android.content.DialogInterface;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
@@ -17,6 +16,11 @@ import android.widget.TextView;
 
 import org.apache.sshd.SshServer;
 import org.apache.sshd.common.NamedFactory;
+import org.apache.sshd.common.future.CloseFuture;
+import org.apache.sshd.common.io.IoService;
+import org.apache.sshd.common.io.IoSession;
+import org.apache.sshd.common.io.IoWriteFuture;
+import org.apache.sshd.common.util.Buffer;
 import org.apache.sshd.common.util.OsUtils;
 import org.apache.sshd.server.Command;
 import org.apache.sshd.server.PasswordAuthenticator;
@@ -26,17 +30,17 @@ import org.apache.sshd.server.auth.UserAuthPublicKey;
 import org.apache.sshd.server.command.ScpCommandFactory;
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
 import org.apache.sshd.server.session.ServerSession;
-import org.apache.sshd.server.sftp.SftpSubsystem;
 import org.apache.sshd.server.shell.ProcessShellFactory;
+import org.apache.sshd.sftp.subsystem.SftpSubsystem;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.SocketAddress;
 import java.security.PublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.ArrayList;
@@ -50,6 +54,7 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
     private final String FILE_EXTENSION = ".csv";
 
     private SshServer mSshd = null;
+    private ServerSession mSession;
     private ListView mMyNetworkList;
     private boolean mServerIsAlive = false;
     private String mAliveServerName = null;
@@ -99,14 +104,15 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
                         return;
                     }
                     if ( mSshd != null ) {
-                        try {
-                            mServerIsAlive = false;
-                            mAliveServerName = null;
-                            mSshd.stop();
-                            mSshd = null;
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                        mServerIsAlive = false;
+                        mAliveServerName = null;
+                            try {
+                                mSshd.stop( true ); //stop immediately
+                                mSession.close( true ); //session close immediately.
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        mSshd = null;
                     }
                 } else {  //Serverが Not Alive なら Start する
                     mServerIsAlive = true;
@@ -294,7 +300,6 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
         //============================================================================
         //ssh
         //============================================================================
-//        SshServer sshd = SshServer.setUpDefaultServer();
         mSshd = SshServer.setUpDefaultServer();
         //============================================================================
         //port
@@ -304,7 +309,8 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
         //
         //============================================================================
         mSshd.setKeyPairProvider( new SimpleGeneratorHostKeyProvider( getApplicationContext().getFilesDir() + "/hostkey.ser" ) );
-        //Log.d( CLASS_NAME, "setKeyPairProvider()-> " + getApplicationContext().getFilesDir() + "/hostkey.ser" );
+//        mSshd.setKeyPairProvider( new SimpleGeneratorHostKeyProvider() );
+
         //============================================================================
         //認証方式の設定
         //============================================================================
@@ -314,6 +320,7 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
         //パスワード認証のロジックinterface
             @Override
             public boolean authenticate(String username, String password, ServerSession session) {
+                mSession = session;
                 return false;
             }
         });
@@ -321,13 +328,12 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
         mSshd.setPublickeyAuthenticator( new PublickeyAuthenticator() {
             @Override
             public boolean authenticate(String username, PublicKey key, ServerSession session) {
-
+                mSession = session;
                 String fileName = "sftp_" + username + ".csv";
                 File file = new File( getApplicationContext().getFilesDir() + "/" + fileName );
                 if ( !file.exists() ) {
                     return false;
                 }
-
                 String settingPubKey = null;
                 try {
                     FileInputStream inputStream = openFileInput( fileName );
