@@ -6,7 +6,6 @@ import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -16,11 +15,6 @@ import android.widget.TextView;
 
 import org.apache.sshd.SshServer;
 import org.apache.sshd.common.NamedFactory;
-import org.apache.sshd.common.future.CloseFuture;
-import org.apache.sshd.common.io.IoService;
-import org.apache.sshd.common.io.IoSession;
-import org.apache.sshd.common.io.IoWriteFuture;
-import org.apache.sshd.common.util.Buffer;
 import org.apache.sshd.common.util.OsUtils;
 import org.apache.sshd.server.Command;
 import org.apache.sshd.server.PasswordAuthenticator;
@@ -30,8 +24,8 @@ import org.apache.sshd.server.auth.UserAuthPublicKey;
 import org.apache.sshd.server.command.ScpCommandFactory;
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
 import org.apache.sshd.server.session.ServerSession;
+import org.apache.sshd.server.sftp.SftpSubsystem;
 import org.apache.sshd.server.shell.ProcessShellFactory;
-import org.apache.sshd.sftp.subsystem.SftpSubsystem;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -40,7 +34,6 @@ import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.SocketAddress;
 import java.security.PublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.ArrayList;
@@ -54,10 +47,10 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
     private final String FILE_EXTENSION = ".csv";
 
     private SshServer mSshd = null;
-    private ServerSession mSession;
+    private ServerSession mSession = null;
     private ListView mMyNetworkList;
-    private boolean mServerIsAlive = false;
-    private String mAliveServerName = null;
+    private boolean mIsAlive = false;
+    private String mAliveName = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -94,43 +87,43 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
     }
 
     public void onSelectAction( int menuIndex, String setting ) {
-        //Log.d( CLASS_NAME, "onSelectAction() menuIndex / alive : " + menuIndex + " / " + mAliveServerName );
+        //Log.d( CLASS_NAME, "onSelectAction() menuIndex / alive : " + menuIndex + " / " + mAliveName );
         switch ( menuIndex ) {
             case 0 : //start / stop
-                if (mServerIsAlive) { //Serverが Alive なら Stop する
-                    if ( !mAliveServerName.equals( setting ) ) { //現在 Alive なサーバーとは異なるサーバーの start/stop が選択された時無視！！
-                        String message = "Other Setting Alive ! \nPlease disable that setting. \n[ "  + mAliveServerName + " is Alive Now ]";
+                if ( mIsAlive ) { //SSHDサーバが起動中
+                    if ( !mAliveName.equals( setting ) ) { //選択されたSSHサーバー名と違うものが起動中なら拒否。
+                        String message = mAliveName + " is Alive Now !\n( Activate only one. )";
                         showAlertDialog( message );
                         return;
                     }
-                    if ( mSshd != null ) {
-                        mServerIsAlive = false;
-                        mAliveServerName = null;
-                            try {
-                                mSshd.stop( true ); //stop immediately
-                                mSession.close( true ); //session close immediately.
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                        mSshd = null;
+                    try {
+                        mSshd.stop( true ); //stop immediately
+                        if ( mSession != null ) { mSession.close( true ); } //session close immediately.
+                        mIsAlive = false;
+                        mAliveName = null;
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
-                } else {  //Serverが Not Alive なら Start する
-                    mServerIsAlive = true;
-                    mAliveServerName = setting;
-                    startSFTP( setting );
+
+                } else { //SSHDサーバが停止中
+                    startSFTP( setting ); //開始する。
+                    mIsAlive = true;
+                    mAliveName = setting;
                 }
-                updateStatus( setting, mServerIsAlive);
+                updateStatus( setting, mIsAlive);
                 break;
+
             case 1 : //edit setting
-                if ( mServerIsAlive && mAliveServerName.equals( setting ) ) {
+                if ( mIsAlive && mAliveName.equals( setting ) ) {
                     showAlertDialog( "Please after Stop. [edit]" );
                     return;
                 }
                 String fileName = FILE_PREFIX + setting + FILE_EXTENSION;
                 editSetting( fileName );
                 break;
+
             case 2 : //remove setting
-                if ( mServerIsAlive && mAliveServerName.equals( setting ) ) {
+                if ( mIsAlive && mAliveName.equals( setting ) ) {
                     showAlertDialog( "Please stop. [remove]" );
                     return;
                 }
@@ -182,7 +175,7 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 MyNetworkItem item = (MyNetworkItem) parent.getItemAtPosition( position ); //選択した設定
                 SelectActionDialog selectActionDiaglog = SelectActionDialog.newInstance( "Select Action",
-                        item.getNetworkName().getText().toString(), mServerIsAlive);
+                        item.getNetworkName().getText().toString(), mIsAlive);
                 selectActionDiaglog.show( getSupportFragmentManager(), "selectFileDialog" );
             }
         });
@@ -296,7 +289,7 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
         //============================================================================
         //update status
         //============================================================================
-        updateStatus( setting, mServerIsAlive);
+        updateStatus( setting, mIsAlive);
         //============================================================================
         //ssh
         //============================================================================
@@ -320,7 +313,7 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
         //パスワード認証のロジックinterface
             @Override
             public boolean authenticate(String username, String password, ServerSession session) {
-                mSession = session;
+                //mSession = session;
                 return false;
             }
         });
