@@ -6,6 +6,7 @@ import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -75,7 +76,14 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
     public boolean onOptionsItemSelected(MenuItem item) {
         switch ( item.getItemId() ) {
             case R.id.menu_apl_end :
-                //sftpを終了し、アプリを終了する
+                String confirmMessage;
+                if ( mSession == null ||
+                        ( mSession != null && mSession.isClosed() ) ) {
+                    confirmMessage = "終了しますか？";
+                } else {
+                    confirmMessage = "接続しているユーザーがいるようですが、\n終了しますか？";
+                }
+                showConfirmDialog( confirmMessage );
                 break;
             case R.id.menu_append_setting :
                 editSetting( null );
@@ -146,6 +154,18 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
     //
     //private methods
     //
+    private void endApp() {
+        Log.d( CLASS_NAME, "endApp" );
+        //SSHサーバー終了
+        if ( mSshd != null ) { mSshd.close( true ); }
+        //ログインセッション終了
+        if ( mSession != null ) {
+            mSession.close( true );
+        }
+        //アプリ終了(activity終了)
+        finish();
+    }
+
     private void editSetting(String setting ) {
         AppendSettingFragment appendSettingFragment = new AppendSettingFragment();
         Bundle args = new Bundle();
@@ -410,6 +430,28 @@ public class MainActivity extends AppCompatActivity implements AppendSettingFrag
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 //Log.d( CLASS_NAME, "AlertDialog : push OK" );
+                dialog.dismiss();
+            }
+        });
+        builder.show();
+    }
+
+    private void showConfirmDialog( String message ) {
+        AlertDialog.Builder builder = new AlertDialog.Builder( this );
+        builder.setTitle( "Confirm" );
+        builder.setMessage( message );
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                Log.d( CLASS_NAME, "AlertDialog : push OK" );
+                dialog.dismiss();
+                endApp(); //アプリ終了
+            }
+        });
+        builder.setNegativeButton( "CANCEL", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                Log.d( CLASS_NAME, "AlertDialog : push CANCEL" );
                 dialog.dismiss();
             }
         });
